@@ -14,14 +14,14 @@ bool ChronobreakFilter::Filter(int level, const rocksdb::Slice& key, const rocks
   int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::system_clock::now().time_since_epoch()).count();
 
-    // Check if the timestamp is within the last 15 minutes
-  if (now_ms - timestamp < FIFTEEN_MIN_MS) {
-    return false;
+  if (now_ms - timestamp > FIFTEEN_SEC_MS) {
+    std::cout << "[FILTER] Dropping key due to TTL_X: " << key.ToString() << std::endl;
+    return true;  // 삭제
   }
 
-    // Check if the timestamp is a multiple of 60 seconds
   int64_t seconds = timestamp / 1000;
-  if (seconds % 60 != 0) {
+  if (seconds % 5 != 0) {
+    std::cout << "[FILTER] Dropping key due to TTL_Y: " << key.ToString() << std::endl;
     return true;  // 삭제
   }
 
