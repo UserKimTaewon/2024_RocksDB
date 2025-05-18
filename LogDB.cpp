@@ -56,3 +56,11 @@ void LogDB::read(const std::string& key) {
     // debug code
     std::cout << "[" << key << "] " << record.raw_line << std::endl;
 }
+
+void LogDB::compact() {
+    if (db_) {
+        std::cout << "[COMPACTION] Manual compaction triggered." << std::endl;
+        db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr, nullptr);
+    }
+}
+
