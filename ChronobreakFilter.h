@@ -13,7 +13,7 @@ class ChronobreakFilter : public rocksdb::CompactionFilter {
   const char* Name() const override;
 
  private:
-  static constexpr int64_t FIFTEEN_MIN_MS = 15 * 60 * 1000;
+  static constexpr int64_t FIFTEEN_MIN_MS = 15 * 1000;
 };
 
 class ChronobreakFilterFactory : public rocksdb::CompactionFilterFactory {
