@@ -74,5 +74,8 @@ int main(int argc, char* argv[]) {
         db.read(std::get<1>(entries[i]));
     }
 
+    sleep(20);
+    db.compact();
+    std::cout << "Compaction done." << std::endl;
     return 0;
 }
