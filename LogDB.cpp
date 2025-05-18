@@ -8,6 +8,7 @@
 LogDB::LogDB(const std::string& path) {
     rocksdb::Options options;
     options.create_if_missing = true;
+    options.compaction_filter_factory = std::make_shared<ChronobreakFilterFactory>();
 
     std::unique_ptr<rocksdb::DB> dbptr;
     rocksdb::Status status = rocksdb::DB::Open(options, path, &dbptr);
