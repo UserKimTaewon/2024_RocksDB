@@ -19,12 +19,14 @@ bool ChronobreakFilter::Filter(int level, const rocksdb::Slice& key, const rocks
     return true;  // 삭제
   }
 
+  /*
   int64_t seconds = timestamp / 1000;
   if (seconds % 5 != 0) {
     std::cout << "[FILTER] Dropping key due to TTL_Y: " << key.ToString() << std::endl;
     return true;  // 삭제
   }
-
+  */
+ 
   return false;
 }
 
