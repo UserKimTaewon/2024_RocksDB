@@ -4,6 +4,7 @@
 #include <regex>
 #include <string>
 #include <memory>
+#include <iostream>
 
 class ChronobreakFilter : public rocksdb::CompactionFilter {
  public:
@@ -13,7 +14,7 @@ class ChronobreakFilter : public rocksdb::CompactionFilter {
   const char* Name() const override;
 
  private:
-  static constexpr int64_t FIFTEEN_MIN_MS = 15 * 1000;
+  static constexpr int64_t FIFTEEN_SEC_MS = 15 * 1000;
 };
 
 class ChronobreakFilterFactory : public rocksdb::CompactionFilterFactory {
