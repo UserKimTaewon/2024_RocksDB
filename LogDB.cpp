@@ -4,19 +4,21 @@
 #include <msgpack.hpp>
 #include <memory>
 #include "ChronobreakFilter.h"
+#include "Key.h"
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 LogDB::LogDB(const std::string& path) {
     rocksdb::Options options;
     options.create_if_missing = true;
     options.compaction_filter_factory = std::make_shared<ChronobreakFilterFactory>();
 
-    std::unique_ptr<rocksdb::DB> dbptr;
-    rocksdb::Status status = rocksdb::DB::Open(options, path, &dbptr);
+    rocksdb::Status status = rocksdb::DB::Open(options, path, &db_);
     if (!status.ok()) {
         std::cerr << "Failed to open RocksDB: " << status.ToString() << std::endl;
         db_ = nullptr;
     } else {
-        db_ = dbptr.release();
+        std::cout << "[INIT] RocksDB opened at path: " << path << std::endl;
     }
 }
 
@@ -24,37 +26,57 @@ LogDB::~LogDB() {
     delete db_;
 }
 
-void LogDB::store(const std::string& key, const std::string& rawLine) {
-    LogRecord record { rawLine };
-    std::stringstream buffer;
-    msgpack::pack(buffer, record);
+void LogDB::store(const LogKey& key, const std::string& rawLine) {
+    std::string encodedKey = serializeKey(key);
 
-    if (db_) {
-        // debug code
-        std::cout << "[STORE] key = " << key << std::endl;
+    try {
+        json parsed = json::parse(rawLine);
+        std::vector<std::uint8_t> msgpack_data = json::to_msgpack(parsed);
 
-        rocksdb::Status s = db_->Put(rocksdb::WriteOptions(), key, buffer.str());
-        if (!s.ok()) {
-            std::cerr << "Failed to save DB: " << s.ToString() << std::endl;
+        if (db_) {
+            rocksdb::Status s = db_->Put(
+                rocksdb::WriteOptions(),
+                encodedKey,
+                rocksdb::Slice(reinterpret_cast<const char*>(msgpack_data.data()), msgpack_data.size())
+            );
+
+            std::cout << "[STORE] session=" << std::get<0>(key)
+                      << " timestamp=" << std::get<1>(key)
+                      << " type_size=" << std::get<2>(key).size()
+                      << " status=" << s.ToString() << std::endl;
+
+            if (!s.ok()) {
+                std::cerr << "Failed to save DB: " << s.ToString() << std::endl;
+            }
         }
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to parse JSON or convert to MsgPack: " << e.what() << std::endl;
     }
 }
 
-void LogDB::read(const std::string& key) {
+void LogDB::read(const LogKey& key) {
+    std::string encodedKey = serializeKey(key);
+
     if (!db_) return;
     std::string val;
-    rocksdb::Status s = db_->Get(rocksdb::ReadOptions(), key, &val);
+    rocksdb::Status s = db_->Get(rocksdb::ReadOptions(), encodedKey, &val);
+
     if (!s.ok()) {
-        std::cerr << "Failed to read DB: " << s.ToString() << std::endl;
+        std::cerr << "[READ FAIL] session=" << std::get<0>(key)
+                  << " timestamp=" << std::get<1>(key)
+                  << " type_size=" << std::get<2>(key).size()
+                  << " status=" << s.ToString() << std::endl;
         return;
     }
 
-    msgpack::object_handle oh = msgpack::unpack(val.data(), val.size());
-    LogRecord record;
-    oh.get().convert(record);
-
-    // debug code
-    std::cout << "[" << key << "] " << record.raw_line << std::endl;
+    try {
+        json parsed = json::from_msgpack(val);
+        std::cout << "[READ] session=" << std::get<0>(key)
+                  << " timestamp=" << std::get<1>(key)
+                  << " data=" << parsed.dump() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[READ ERROR] Failed to decode MsgPack: " << e.what() << std::endl;
+    }
 }
 
 void LogDB::compact() {
@@ -63,4 +85,3 @@ void LogDB::compact() {
         db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr, nullptr);
     }
 }
-
