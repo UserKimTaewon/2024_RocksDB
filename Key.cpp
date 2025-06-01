@@ -11,7 +11,7 @@ void serializeKey(const LogKey& key,std::string& out) {
     std::string& result=out;
     uint32_t session_id = std::get<0>(key);
     uint32_t timestamp = std::get<1>(key);
-    const std::vector<uint8_t>& type = std::get<2>(key);
+    auto type = std::get<2>(key);
     uint8_t buf[KEY_MIN_SIZE];
     fill_key(session_id,timestamp,buf);
 
@@ -39,7 +39,7 @@ LogKey deserializeKey(const std::string& raw) {
     session_id=DecodeFixed32BE(ptr);
     timestamp=DecodeFixed32BE(ptr+4);
 
-    std::vector<uint8_t> type(raw.begin() + 8, raw.end());
+    std::string type(raw.begin() + 8, raw.end());
 
     return { session_id, timestamp, type };
 }
@@ -55,7 +55,7 @@ LogKey deserializeKey(const rocksdb::Slice key){
     session_id=DecodeFixed32BE(ptr);
     timestamp=DecodeFixed32BE(ptr+4);
 
-    std::vector<uint8_t> type(ptr + 8, ptr+key.size());
+    std::string type(ptr + 8, ptr+key.size());
 
     return { session_id, timestamp, type };
 

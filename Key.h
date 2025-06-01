@@ -8,7 +8,7 @@
 
 using timestamp_t=uint32_t;
 using sessionid_t=uint32_t;
-using LogKey = std::tuple<sessionid_t,timestamp_t, std::vector<uint8_t>>;
+using LogKey = std::tuple<sessionid_t,timestamp_t, std::string>;
 const int KEY_MIN_SIZE=8;
 static_assert(KEY_MIN_SIZE==sizeof(sessionid_t)+sizeof(timestamp_t));
 static_assert(sizeof(sessionid_t)==4);
