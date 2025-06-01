@@ -1,7 +1,7 @@
 #include "LogDB.h"
 #include <iostream>
 #include <sstream>
-#include <msgpack.hpp>
+//#include <msgpack.hpp>
 #include <memory>
 #include "ChronobreakFilter.h"
 #include "Key.h"
@@ -84,4 +84,59 @@ void LogDB::compact() {
         std::cout << "[COMPACTION] Manual compaction triggered." << std::endl;
         db_->CompactRange(rocksdb::CompactRangeOptions(), nullptr, nullptr);
     }
+}
+
+timestamp_t LogDB::lastTimeStamp(sessionid_t sessionid){
+  char last_key_guard[KEY_MIN_SIZE];
+  rocksdb::Slice last_key(last_key_guard,KEY_MIN_SIZE);
+  fill_key(sessionid+1,0,reinterpret_cast<uint8_t *>(last_key_guard));
+  rocksdb::ReadOptions read_option=rocksdb::ReadOptions();
+  read_option.allow_unprepared_value=true;
+  
+  auto it=db_->NewIterator(read_option);
+
+  it->SeekForPrev(last_key);
+  assert(it->Valid());
+  auto key=it->key();
+  timestamp_t timestamp= std::get<1>(deserializeKey(key));
+  delete it;
+  return timestamp;
+}
+
+rocksdb::Status LogDB::ChronoBreak(sessionid_t sessionid,timestamp_t rollback_diff){
+    timestamp_t last_timestamp=lastTimeStamp(sessionid);
+    return ChronoBreakAbsolute(sessionid,last_timestamp-rollback_diff);
+}
+
+rocksdb::Status LogDB::ChronoBreakAbsolute(sessionid_t sessionid,timestamp_t rollback_time){
+char begin_key_guard[KEY_MIN_SIZE],end_key_guard[KEY_MIN_SIZE];
+  rocksdb::Slice begin_key(begin_key_guard,KEY_MIN_SIZE),end_key(end_key_guard,KEY_MIN_SIZE);
+  fill_key(sessionid,rollback_time,reinterpret_cast<uint8_t *> (begin_key_guard));
+  fill_key(sessionid+1,0,reinterpret_cast<uint8_t *>( end_key_guard));
+  return db_->DeleteRange(rocksdb::WriteOptions(),begin_key,end_key);
+}
+
+std::string LogDB::ReadMSGPack(const LogKey& key){
+    if (!db_) throw std::runtime_error("no db");;
+    std::string encodedKey = serializeKey(key);
+    std::string val;
+    rocksdb::Status s = db_->Get(rocksdb::ReadOptions(), encodedKey, &val);
+
+    if (!s.ok()) {
+        std::cerr << "[READ FAIL] session=" << std::get<0>(key)
+                  << " timestamp=" << std::get<1>(key)
+                  << " type_size=" << std::get<2>(key).size()
+                  << " status=" << s.ToString() << std::endl;
+        throw std::runtime_error("read fail");
+    }
+    return val;
+}
+
+LogDBIterator * LogDB::NewIterator(){
+    auto it=db_->NewIterator(rocksdb::ReadOptions());
+    return new LogDBIterator(it);
+
+}
+LogDBBoundedIterator * LogDB::NewBoundedIterator(sessionid_t sessionid){
+    return new LogDBBoundedIterator(db_,sessionid);
 }
