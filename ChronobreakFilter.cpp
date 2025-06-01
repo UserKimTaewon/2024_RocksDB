@@ -1,16 +1,13 @@
 #include "ChronobreakFilter.h"
+#include "Key.h"
 
 ChronobreakFilter::ChronobreakFilter() {}
 
 bool ChronobreakFilter::Filter(int level, const rocksdb::Slice& key, const rocksdb::Slice& value,
                                 std::string* new_value, bool* value_changed) const {
-  std::string key_str = key.ToString();
-  std::regex pattern(R"(\d+,\s*(\d+),)");
-  std::smatch match;
 
-  if (!std::regex_search(key_str, match, pattern)) return false;
+  int64_t timestamp =std::get<1>(deserializeKey(key));
 
-  int64_t timestamp = std::stoll(match[1]);
   int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::system_clock::now().time_since_epoch()).count();
 
