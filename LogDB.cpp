@@ -105,6 +105,9 @@ timestamp_t LogDB::lastTimeStamp(sessionid_t sessionid){
 
 rocksdb::Status LogDB::ChronoBreak(sessionid_t sessionid,timestamp_t rollback_diff){
     timestamp_t last_timestamp=lastTimeStamp(sessionid);
+    if(rollback_diff>last_timestamp){
+        return ChronoBreakAbsolute(sessionid,0);
+    }
     return ChronoBreakAbsolute(sessionid,last_timestamp-rollback_diff);
 }
 
