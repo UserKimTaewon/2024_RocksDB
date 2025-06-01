@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include "db_utils.h"
 
 using json = nlohmann::json;
 
@@ -34,7 +35,7 @@ LogKey parseKey(const std::string& raw_key_str) {
     int64_t timestamp = std::stoll(match[2].str());
     std::string type_str = match[3].str();
 
-    std::vector<uint8_t> type_bytes(type_str.begin(), type_str.end());
+    std::string type_bytes(type_str.begin(), type_str.end());
 
     return { session_id, timestamp, type_bytes };
 }
@@ -87,16 +88,32 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < entries.size(); ++i) {
         if (i == 300) {
             std::cout << "[CHRONO BREAK] applying -5min at i = " << i << std::endl;
+            {
+            std::ofstream jsonl_dump("test_db_dump_before_chrono_break.jsonl");
+            dump_to_jsonl(&db,jsonl_dump);
+            jsonl_dump.close();
+            }
+            
             int64_t original_ts = std::get<1>(entries[i].first);
-            std::get<1>(entries[i].first) -= 300000;
-            chronoShift = original_ts - std::get<1>(entries[i].first);
+            chronoShift=std::min<int64_t>(original_ts,300000);
+            //chronoShift = original_ts - std::get<1>(entries[i].first);
+            std::get<1>(entries[i].first) -= chronoShift;
             chronoBreakApplied = true;
+            db.ChronoBreak(fileIndex,static_cast<timestamp_t>(chronoShift));
+            {
+            std::ofstream jsonl_out("test_db_dump_right_after_chrono_break.jsonl");
+            dump_to_jsonl(&db,jsonl_out);
+            jsonl_out.close();
+            }
         } else if (chronoBreakApplied) {
             std::get<1>(entries[i].first) -= chronoShift;
+
         }
 
         if (i > 0) {
-            int64_t delta = std::get<1>(entries[i].first) - std::get<1>(entries[i - 1].first);
+            int64_t delta = 
+            static_cast<int64_t>(std::get<1>(entries[i].first)) - 
+            static_cast<int64_t>(std::get<1>(entries[i - 1].first));
             if (delta > 0) {
                 double wait_time = static_cast<double>(delta) / 1000.0 / 20.0;
                 std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(wait_time * 1000)));
@@ -125,6 +142,10 @@ int main(int argc, char* argv[]) {
     }
 
     storeLogFile.close();
+    
+    std::ofstream jsonl_dump("test_db_dump.jsonl");
+    dump_to_jsonl(&db,jsonl_dump);
+    jsonl_dump.close();
 
     std::cout << "\n[READ CHECK] Entries around chrono break:\n";
     for (size_t i = 295; i <= 305 && i < entries.size(); ++i) {
@@ -136,7 +157,8 @@ int main(int argc, char* argv[]) {
         db.read(entries[i].first);
     }
 
-    sleep(20);
+    //sleep(20);
+    std::this_thread::sleep_for(std::chrono::seconds(20));
     db.compact();
     std::cout << "Compaction done." << std::endl;
     return 0;
