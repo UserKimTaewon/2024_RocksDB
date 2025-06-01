@@ -4,4 +4,5 @@ build/
 logfiles/
 logdb/
 *.txt
+*.jsonl
 log_example
