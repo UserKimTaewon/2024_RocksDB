@@ -1,3 +1,7 @@
 *.xz
 build/
 .vscode/
+logfiles/
+logdb/
+*.txt
+log_example
